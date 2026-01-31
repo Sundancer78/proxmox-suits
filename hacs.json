@@ -1,0 +1,6 @@
+{
+  "name": "Proxmox Suits",
+  "content_in_root": false,
+  "domains": ["proxmox_suite"],
+  "render_readme": true
+}

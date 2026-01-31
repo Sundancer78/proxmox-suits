@@ -1,0 +1,27 @@
+{
+  "title": "Proxmox Suits",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Backend auswählen",
+        "data": {
+          "backend": "Backend (pve/pbs)"
+        }
+      },
+      "connection": {
+        "title": "Verbindung",
+        "data": {
+          "host": "Host/IP",
+          "port": "Port",
+          "token_id": "Token ID (z.B. root@pam!ha)",
+          "token_secret": "Token Secret",
+          "node": "Node (optional, PBS meist localhost)",
+          "verify_ssl": "SSL Zertifikat prüfen"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Verbindung fehlgeschlagen (Host/Port/Token/SSL prüfen)."
+    }
+  }
+}

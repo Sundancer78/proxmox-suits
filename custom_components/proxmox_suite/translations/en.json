@@ -1,0 +1,28 @@
+{
+  "title": "Proxmox Suits",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Proxmox Suits",
+        "description": "Configure a Proxmox VE or Proxmox Backup Server connection.",
+        "data": {
+          "backend": "Backend",
+          "host": "Host",
+          "port": "Port",
+          "node": "Node (PVE only, optional)",
+          "token_id": "Token ID",
+          "token_secret": "Token Secret",
+          "verify_ssl": "Verify SSL certificate"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect",
+      "invalid_auth": "Invalid authentication",
+      "unknown": "Unexpected error"
+    },
+    "abort": {
+      "already_configured": "Device is already configured"
+    }
+  }
+}
