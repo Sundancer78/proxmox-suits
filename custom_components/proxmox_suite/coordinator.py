@@ -35,7 +35,11 @@ class ProxmoxCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.node = entry.data.get(CONF_NODE) or ("localhost" if self.backend == BACKEND_PBS else "")
         self.verify_ssl = entry.data[CONF_VERIFY_SSL]
 
+        # Stable identifier (do NOT change this for display reasons)
         self.device_identifier = f"{self.backend}:{self.host}:{self.port}"
+
+        # UI name (never IP)
+        self.display_name: str = ""
 
         token_id = entry.data[CONF_TOKEN_ID]
         token_secret = entry.data[CONF_TOKEN_SECRET]
@@ -58,20 +62,48 @@ class ProxmoxCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
 
     async def _safe_get(self, path: str, *, params: dict[str, Any] | None = None, default: Any = None) -> Any:
-        """Fetch a Proxmox endpoint; on error return default (does NOT fail the coordinator)."""
         try:
             return await self.api.get(path, params=params)
         except ProxmoxApiError as e:
             _LOGGER.debug("API call failed (%s): %s", path, e)
             return default
 
+    @staticmethod
+    def _extract_hostname_from_status(status: Any) -> str | None:
+        """Try to extract a nice hostname/nodename from a PBS status payload."""
+        if not isinstance(status, dict):
+            return None
+
+        for key in ("hostname", "nodename", "node", "name"):
+            v = status.get(key)
+            if isinstance(v, str) and v.strip():
+                return v.strip()
+
+        node = status.get("node")
+        if isinstance(node, dict):
+            for key in ("hostname", "nodename", "name"):
+                v = node.get(key)
+                if isinstance(v, str) and v.strip():
+                    return v.strip()
+
+        return None
+
+    def _set_display_name_no_ip(self, *, pve_node: str | None = None, pbs_hostname: str | None = None) -> None:
+        """Enforce no-IP display naming."""
+        if self.backend == BACKEND_PVE:
+            # For PVE: prefer node
+            self.display_name = (pve_node or self.node or "PVE").strip()
+            return
+
+        # For PBS: prefer real hostname, fallback to PBS (never host/ip)
+        hn = (pbs_hostname or "").strip()
+        self.display_name = hn if hn else "PBS"
+
     async def _async_update_data(self) -> dict[str, Any]:
         try:
-            # version is optional
             version = await self._safe_get("/version", default=None)
 
             if self.backend == BACKEND_PVE:
-                # Determine node if missing
                 if not self.node:
                     nodes = await self._safe_get("/nodes", default=[])
                     self.node = (nodes[0].get("node") if nodes else "") or ""
@@ -80,7 +112,6 @@ class ProxmoxCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
                 status = await self._safe_get(f"/nodes/{self.node}/status", default={})
 
-                # VM/LXC counts (best effort)
                 vms_total = vms_running = 0
                 lxcs_total = lxcs_running = 0
 
@@ -94,17 +125,18 @@ class ProxmoxCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     lxcs_total = len(lxcs)
                     lxcs_running = sum(1 for ct in lxcs if ct.get("status") == "running")
 
-                # Optional running tasks for PVE (best effort)
                 tasks_running = await self._safe_get(
                     f"/nodes/{self.node}/tasks",
-                    params={"running": "true", "limit": 200}
-,
+                    params={"running": "true", "limit": 200},
                     default=[],
                 )
+
+                self._set_display_name_no_ip(pve_node=self.node)
 
                 return {
                     "backend": BACKEND_PVE,
                     "node": self.node,
+                    "display_name": self.display_name,
                     "version": version,
                     "status": status or {},
                     "counts": {
@@ -121,32 +153,31 @@ class ProxmoxCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # ======================
             node = self.node or "localhost"
 
-            # These are best-effort too: if one fails, we still update with what we have.
             status = await self._safe_get(f"/nodes/{node}/status", default={})
             datastores = await self._safe_get("/status/datastore-usage", default=[])
 
-            # All tasks (raise limit so failures aren't truncated)
             tasks_all = await self._safe_get(
                 f"/nodes/{node}/tasks",
                 params={"limit": 200},
                 default=[],
             )
 
-            # Running tasks filtered (may be empty if no running tasks or endpoint ignores filter)
             tasks_running = await self._safe_get(
                 f"/nodes/{node}/tasks",
                 params={"running": "true", "limit": 200},
                 default=[],
             )
 
-            # If everything is empty AND status/datastores empty, likely no connectivity → fail coordinator
-            # (prevents "false green" when PBS is completely unreachable)
             if not status and not datastores and not tasks_all and not tasks_running:
                 raise UpdateFailed("PBS: all API calls failed (no data returned)")
+
+            hostname = self._extract_hostname_from_status(status)
+            self._set_display_name_no_ip(pbs_hostname=hostname)
 
             return {
                 "backend": BACKEND_PBS,
                 "node": node,
+                "display_name": self.display_name,
                 "version": version,
                 "status": status or {},
                 "datastores": datastores or [],
@@ -157,5 +188,4 @@ class ProxmoxCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         except UpdateFailed:
             raise
         except Exception as e:
-            # Any unexpected exception should mark update failed (and show in logs)
             raise UpdateFailed(str(e)) from e

@@ -4,27 +4,8 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
-from .const import (
-    DOMAIN,
-    PLATFORMS,
-    CONF_BACKEND,
-    CONF_HOST,
-)
+from .const import DOMAIN, PLATFORMS
 from .coordinator import ProxmoxCoordinator
-
-
-def _device_meta(entry: ConfigEntry) -> tuple[str, str, str]:
-    backend = entry.data[CONF_BACKEND]
-    host = entry.data[CONF_HOST]
-
-    if backend == "pve":
-        model = "Proxmox VE"
-    else:
-        model = "Proxmox Backup Server"
-
-    name = f"Proxmox {backend.upper()} ({host})"
-    manufacturer = "Proxmox"
-    return name, manufacturer, model
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -34,23 +15,29 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
-    # Create/update a Device so HA groups entities like in your WeatherDuino screenshot
+    # ✅ Title in "Geräte & Dienste" ohne IP
+    display = coordinator.display_name or ("PVE" if coordinator.backend == "pve" else "PBS")
+    new_title = f"Proxmox {coordinator.backend.upper()} ({display})"
+    if entry.title != new_title:
+        hass.config_entries.async_update_entry(entry, title=new_title)
+
+    # ✅ Device Registry Name ohne IP
     dev_reg = dr.async_get(hass)
-    name, manufacturer, model = _device_meta(entry)
+    model = "Proxmox VE" if coordinator.backend == "pve" else "Proxmox Backup Server"
+    device_name = f"Proxmox {coordinator.backend.upper()} ({display})"
 
     device = dev_reg.async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, coordinator.device_identifier)},
-        name=name,
-        manufacturer=manufacturer,
+        name=device_name,
+        manufacturer="Proxmox",
         model=model,
     )
 
-    # If version info is available, store it as sw_version on the device
+    # Optional: software version
     ver = None
     vdata = (coordinator.data or {}).get("version")
     if isinstance(vdata, dict):
-        # PVE/PBS often returns {"version": "..."} plus other fields
         ver = vdata.get("version") or vdata.get("release")
     elif isinstance(vdata, str):
         ver = vdata

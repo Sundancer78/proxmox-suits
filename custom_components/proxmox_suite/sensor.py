@@ -99,12 +99,11 @@ def _task_is_running(t: dict[str, Any]) -> bool:
     if endtime is None or endtime == "":
         return True
     try:
-        # If it's a number and >0, it's finished
         float(endtime)
         return False
     except Exception:
-        # Not parseable -> treat as running
         return True
+
 
 def _task_is_success(t: dict[str, Any]) -> bool:
     st = (t.get("status") or t.get("state") or "").lower()
@@ -122,9 +121,7 @@ def _task_endtime(t: dict[str, Any]) -> float | None:
 
 
 def _count_failed_tasks_last_24h(tasks: Any) -> int:
-    """Count tasks finished within last 24h with a non-success status.
-    Always returns an int (0 if tasks unavailable).
-    """
+    """Count tasks finished within last 24h with a non-success status."""
     lst = _tasks_list(tasks)
     if not lst:
         return 0
@@ -154,7 +151,7 @@ def _count_failed_tasks_last_24h(tasks: Any) -> int:
 
 
 def _count_running_tasks(tasks: Any) -> int:
-    """Count tasks currently running. Always returns an int."""
+    """Count tasks currently running."""
     lst = _tasks_list(tasks)
     if not lst:
         return 0
@@ -179,13 +176,42 @@ def _tasks_debug_attrs(tasks: Any) -> dict[str, Any]:
     }
 
 
+def _format_uptime_de(seconds: Any) -> str | None:
+    """Return a German human-readable uptime string like '5 Tage 3 Std 12 Min'."""
+    if seconds is None:
+        return None
+    try:
+        s = int(float(seconds))
+    except Exception:
+        return None
+    if s < 0:
+        s = 0
+
+    days, rem = divmod(s, 86400)
+    hours, rem = divmod(rem, 3600)
+    minutes, _ = divmod(rem, 60)
+
+    parts: list[str] = []
+    if days:
+        parts.append(f"{days} Tage" if days != 1 else "1 Tag")
+    if hours:
+        parts.append(f"{hours} Std")
+    if minutes or not parts:
+        parts.append(f"{minutes} Min")
+
+    return " ".join(parts)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities) -> None:
     coord: ProxmoxCoordinator = hass.data[DOMAIN][entry.entry_id]
     entities: list[SensorEntity] = []
 
+    # Device display name should be provided by coordinator (no IP).
+    display = getattr(coord, "display_name", None) or coord.node or "PBS"
+
     device_info = DeviceInfo(
         identifiers={(DOMAIN, coord.device_identifier)},
-        name=f"Proxmox {coord.backend.upper()} ({coord.host})",
+        name=f"Proxmox {coord.backend.upper()} ({display})",
         manufacturer="Proxmox",
         model="Proxmox VE" if coord.backend == BACKEND_PVE else "Proxmox Backup Server",
     )
@@ -214,9 +240,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                 icon="mdi:memory",
                 device_info=device_info,
             ),
+            # ✅ Name without "(GiB)"
             ProxmoxValueSensor(
                 coord, entry,
-                name="Memory Used (GiB)",
+                name="Memory Used",
                 key="mem_used_gib",
                 getter=lambda d: _bytes_to_gib(((d.get("status") or {}).get("memory") or {}).get("used")),
                 unit="GiB",
@@ -225,9 +252,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                 icon="mdi:memory",
                 device_info=device_info,
             ),
+            # ✅ Name without "(GiB)"
             ProxmoxValueSensor(
                 coord, entry,
-                name="Memory Total (GiB)",
+                name="Memory Total",
                 key="mem_total_gib",
                 getter=lambda d: _bytes_to_gib(((d.get("status") or {}).get("memory") or {}).get("total")),
                 unit="GiB",
@@ -255,6 +283,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                 unit=UnitOfTime.SECONDS,
                 device_class=SensorDeviceClass.DURATION,
                 state_class=SensorStateClass.TOTAL_INCREASING,
+                icon="mdi:clock-outline",
+                device_info=device_info,
+            ),
+            ProxmoxTextSensor(
+                coord, entry,
+                name="Uptime (lesbar)",
+                key="uptime_lesbar",
+                getter=lambda d: _format_uptime_de((d.get("status") or {}).get("uptime")),
                 icon="mdi:clock-outline",
                 device_info=device_info,
             ),
@@ -317,9 +353,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                 icon="mdi:cpu-64-bit",
                 device_info=device_info,
             ),
+            # ✅ Name without "(GiB)"
             ProxmoxValueSensor(
                 coord, entry,
-                name="Memory Used (GiB)",
+                name="Memory Used",
                 key="mem_used_gib",
                 getter=lambda d: _bytes_to_gib(((d.get("status") or {}).get("memory") or {}).get("used")),
                 unit="GiB",
@@ -328,9 +365,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                 icon="mdi:memory",
                 device_info=device_info,
             ),
+            # ✅ Name without "(GiB)"
             ProxmoxValueSensor(
                 coord, entry,
-                name="Memory Total (GiB)",
+                name="Memory Total",
                 key="mem_total_gib",
                 getter=lambda d: _bytes_to_gib(((d.get("status") or {}).get("memory") or {}).get("total")),
                 unit="GiB",
@@ -350,7 +388,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                 icon="mdi:clock-outline",
                 device_info=device_info,
             ),
-            # ✅ Only ONE Running Tasks sensor (with debug attributes)
+            ProxmoxTextSensor(
+                coord, entry,
+                name="Uptime (lesbar)",
+                key="uptime_lesbar",
+                getter=lambda d: _format_uptime_de((d.get("status") or {}).get("uptime")),
+                icon="mdi:clock-outline",
+                device_info=device_info,
+            ),
             ProxmoxTaskSensor(
                 coord, entry,
                 name="Running Tasks",
@@ -379,9 +424,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             prefix = f"Datastore {store}"
 
             entities += [
+                # ✅ Name without "(GiB)"
                 DatastoreValueSensor(
                     coord, entry, store=store,
-                    name=f"{prefix} Free (GiB)",
+                    name=f"{prefix} Free",
                     key=f"ds:{store}:free_gib",
                     getter=lambda x: _bytes_to_gib(x.get("avail")),
                     unit="GiB",
@@ -389,9 +435,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                     state_class=SensorStateClass.MEASUREMENT,
                     device_info=device_info,
                 ),
+                # ✅ Name without "(GiB)"
                 DatastoreValueSensor(
                     coord, entry, store=store,
-                    name=f"{prefix} Used (GiB)",
+                    name=f"{prefix} Used",
                     key=f"ds:{store}:used_gib",
                     getter=lambda x: _bytes_to_gib(x.get("used")),
                     unit="GiB",
@@ -399,9 +446,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                     state_class=SensorStateClass.MEASUREMENT,
                     device_info=device_info,
                 ),
+                # ✅ Name without "(GiB)"
                 DatastoreValueSensor(
                     coord, entry, store=store,
-                    name=f"{prefix} Total (GiB)",
+                    name=f"{prefix} Total",
                     key=f"ds:{store}:total_gib",
                     getter=lambda x: _bytes_to_gib(x.get("total")),
                     unit="GiB",
@@ -456,6 +504,39 @@ class ProxmoxValueSensor(CoordinatorEntity[ProxmoxCoordinator], SensorEntity):
 
     @property
     def native_value(self) -> Any:
+        return self._getter(self.coordinator.data or {})
+
+
+class ProxmoxTextSensor(CoordinatorEntity[ProxmoxCoordinator], SensorEntity):
+    """A sensor that returns a human-readable string (no unit/device_class)."""
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: ProxmoxCoordinator,
+        entry: ConfigEntry,
+        name: str,
+        key: str,
+        getter: Callable[[dict[str, Any]], str | None],
+        icon: Optional[str],
+        device_info: DeviceInfo,
+    ) -> None:
+        super().__init__(coordinator)
+        self.entry = entry
+        self._attr_name = name
+        self._attr_unique_id = f"{entry.entry_id}:{coordinator.backend}:{key}"
+        self._getter = getter
+
+        self._attr_native_unit_of_measurement = None
+        self._attr_device_class = None
+        self._attr_state_class = None
+        if icon:
+            self._attr_icon = icon
+
+        self._attr_device_info = device_info
+
+    @property
+    def native_value(self) -> str | None:
         return self._getter(self.coordinator.data or {})
 
 
