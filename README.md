@@ -11,6 +11,28 @@ It focuses on:
 
 ---
 
+## 🖥️ Dashboard Example (PBS)
+
+Example Home Assistant dashboard using **Proxmox Suits**  
+showing task status and datastore usage.
+
+![Proxmox Backup Server Dashboard](Screenshots/dashboard.png)
+
+---
+
+
+## 📊 Example Sensors (Home Assistant)
+
+### Proxmox Backup Server (PBS)
+
+![Proxmox Backup Server Sensors](Screenshots/pbs-sensoren.png)
+
+### Proxmox VE (PVE)
+
+![Proxmox VE Sensors](Screenshots/pve-sensoren.png)
+
+---
+
 ## ✨ Features
 
 ### Proxmox VE

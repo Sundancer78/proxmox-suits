@@ -1,0 +1,114 @@
+title: Proxmox Suits
+views:
+  - title: PBS (Tiles)
+    path: pbs_tiles
+    cards:
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: custom:mushroom-template-card
+            primary: PBS Tasks
+            secondary: >
+              Running: {{ states('sensor.proxmox_pbs_localhost_running_tasks')
+              }} · Failed (24h): {{
+              states('sensor.proxmox_pbs_localhost_failed_tasks_24h') }}
+            icon: mdi:backup-restore
+            color: >
+              {% set failed =
+              states('sensor.proxmox_pbs_localhost_failed_tasks_24h')|int(0) %}
+              {% set running =
+              states('sensor.proxmox_pbs_localhost_running_task')|int(0) %} {{
+              'red' if failed > 0 else 'orange' if running > 0 else 'green' }}
+            features_position: bottom
+          - type: custom:mushroom-template-card
+            primary: PBS CPU
+            secondary: '{{ states(''sensor.proxmox_pbs_localhost_cpu_usage'') }} %'
+            icon: mdi:cpu-64-bit
+            color: >
+              {% set v =
+              states('sensor.proxmox_pbs_localhost_cpu_usage')|float(0) %} {{
+              'red' if v >= 85 else 'orange' if v >= 70 else 'green' }}
+            features_position: bottom
+      - type: custom:mushroom-title-card
+        title: 'Datastore: pbs'
+      - type: grid
+        columns: 3
+        square: false
+        cards:
+          - type: custom:mushroom-template-card
+            primary: Usage
+            secondary: '{{ states(''sensor.proxmox_pbs_localhost_datastore_pbs_usage'') }} %'
+            icon: mdi:chart-donut
+            color: >
+              {% set u =
+              states('sensor.proxmox_pbs_localhost_datastore_pbs_usage')|float(0)
+              %} {{ 'red' if u >= 85 else 'orange' if u >= 70 else 'green' }}
+            features_position: bottom
+          - type: custom:mushroom-template-card
+            primary: Free
+            secondary: >-
+              {{ states('sensor.proxmox_pbs_localhost_datastore_pbs_free_gib')
+              }} GiB
+            icon: mdi:database-arrow-right
+            color: >
+              {% set u =
+              states('sensor.proxmox_pbs_localhost_datastore_pbs_usage')|float(0)
+              %} {{ 'red' if u >= 85 else 'orange' if u >= 70 else 'green' }}
+            features_position: bottom
+          - type: custom:mushroom-template-card
+            primary: Used / Total
+            secondary: >
+              {{ states('sensor.proxmox_pbs_localhost_datastore_pbs_used_gib')
+              }} / {{
+              states('sensor.proxmox_pbs_localhost_datastore_pbs_total_gib') }}
+              GiB
+            icon: mdi:database
+            color: >
+              {% set u = states('sensor.pbs_pbs_usage')|float(0) %} {{ 'red' if
+              u >= 85 else 'orange' if u >= 70 else 'green' }}
+            features_position: bottom
+      - type: custom:mushroom-title-card
+        title: 'Datastore: pbs-small'
+      - type: grid
+        columns: 3
+        square: false
+        cards:
+          - type: custom:mushroom-template-card
+            primary: Usage
+            secondary: >-
+              {{
+              states('sensor.proxmox_pbs_localhost_datastore_pbs_small_usage')
+              }} %
+            icon: mdi:chart-donut
+            color: >
+              {% set u =
+              states('sensor.proxmox_pbs_localhost_datastore_pbs_small_usage')|float(0)
+              %} {{ 'red' if u >= 85 else 'orange' if u >= 70 else 'green' }}
+            features_position: bottom
+          - type: custom:mushroom-template-card
+            primary: Free
+            secondary: >-
+              {{
+              states('sensor.proxmox_pbs_localhost_datastore_pbs_small_free_gib')
+              }} GiB
+            icon: mdi:database-arrow-right
+            color: >
+              {% set u =
+              states('sensor.proxmox_pbs_localhost_datastore_pbs_small_usage')|float(0)
+              %} {{ 'red' if u >= 85 else 'orange' if u >= 70 else 'green' }}
+            features_position: bottom
+          - type: custom:mushroom-template-card
+            primary: Used / Total
+            secondary: >
+              {{
+              states('sensor.proxmox_pbs_localhost_datastore_pbs_small_used_gib')
+              }} / {{
+              states('sensor.proxmox_pbs_localhost_datastore_pbs_small_total_gib')
+              }} GiB
+            icon: mdi:database
+            color: >
+              {% set u =
+              states('sensor.proxmox_pbs_localhost_datastore_pbs_small_usage')|float(0)
+              %} {{ 'red' if u >= 85 else 'orange' if u >= 70 else 'green' }}
+            features_position: bottom
